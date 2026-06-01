@@ -1,0 +1,12 @@
+{
+  "name": "s2k-anarsi-bot",
+  "version": "1.0.0",
+  "main": "s2k_anarsi.js",
+  "scripts": {
+    "start": "node s2k_anarsi.js"
+  },
+  "dependencies": {
+    "mineflayer": "^4.20.0",
+    "mineflayer-pathfinder": "^2.4.5"
+  }
+}
