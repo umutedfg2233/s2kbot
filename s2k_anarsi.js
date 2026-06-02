@@ -65,3 +65,8 @@ bot.on('physicsTick', () => {
 bot.on('error', (err) => console.log('Hata: ', err));
 
 console.log("Bot başlatıldı ve özellikler yüklendi!");
+const http = require('http');
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot aktif!');
+}).listen(process.env.PORT || 10000);
