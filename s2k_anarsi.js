@@ -2,153 +2,187 @@ const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const GoalFollow = goals.GoalFollow;
 const http = require('http');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 
-console.log("=== BOT SISTEMI BASLATILIYOR ===");
+console.log("=== ULTRA GIZLI BOT SISTEMI BASLATILIYOR ===");
 
-// Railway'in botu kapatmasını önlemek için mini web sunucusu (Starting Container hatasını çözer)
+// Railway Canlı Tutma Sunucusu
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Bot Aktif!\n');
+  res.end('Bot Sistemleri Gizli Modda Aktif!\n');
 });
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Web sunucusu ${PORT} portunda aktif.`);
-});
+server.listen(PORT, () => { console.log(`Web portu ${PORT} aktif.`); });
 
-// === AYARLAR VE YETKILER ===
 const AYARLAR = {
   host: 'mc.quiltanarchy.xyz',
-  username: 'S2k_' + Math.floor(1000 + Math.random() * 9000), // Her seferinde farklı isim (Anti-Bot için)
-  version: '1.21.1'
+  version: '1.21.1',
+  // EĞER IP ENGELİ DEVAM EDERSE: Buraya "socks5://kullanici:sifre@ip:port" şeklinde proxy yazabilirsin.
+  // Boş bırakırsan normal Railway IP'sini insansı taklitlerle kullanır.
+  proxy: "" 
 };
 
-// Klan/İzinli Oyuncular Listesi (umut ve umutedfg2 doğrudan eklendi)
 const klanListesi = new Set(['umut', 'umutedfg2']); 
-
-const bot = mineflayer.createBot({
-  host: AYARLAR.host,
-  username: AYARLAR.username,
-  version: AYARLAR.version,
-  checkTimeoutInterval: 60000
-});
-
-// Eklentileri Yükle
-bot.loadPlugin(pathfinder);
-
+let bot;
 let takipEdilenOyuncu = null;
 
-bot.on('login', () => {
-  console.log(`>>> Bot sunucuya giris yapti! Isim: ${bot.username}`);
-});
+function botuBaslat() {
+  // Giriş zamanlamasını rastgeleleştir (Anti-Bot mekanizmasını yanıltmak için)
+  const rastgeleGecikme = Math.floor(Math.random() * 5000) + 2000;
+  console.log(`>>> BotSentry analizi yanıltılıyor... ${rastgeleGecikme}ms sonra sızma denenecek.`);
 
-bot.on('spawn', () => {
-  console.log(">>> Bot dunyada dogdu (Spawn oldu). Ozellikler aktif!");
-  bot.chat('/register S2kBot123 S2kBot123'); // Eğer sunucuda kayıt gerekiyorsa
-  bot.chat('/login S2kBot123');
-  
-  // Anti-AFK Döngüsü (Her 15 saniyede bir rastgele hareket eder/zıplar)
-  setInterval(() => {
-    const rastgele = Math.random();
-    if (rastgele < 0.3) {
-      bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 500);
-    } else if (rastgele < 0.6) {
-      bot.setControlState('sneak', true);
-      setTimeout(() => bot.setControlState('sneak', false), 800);
-    } else {
-      bot.swingArm('right');
+  setTimeout(() => {
+    const botSecenekleri = {
+      host: AYARLAR.host,
+      username: 'S2k_' + Math.floor(1000 + Math.random() * 9000),
+      version: AYARLAR.version,
+      checkTimeoutInterval: 120000,
+      physicsEnabled: true // Gerçekçi fizik motoru aktif
+    };
+
+    // Eğer proxy tanımlandıysa devreye sok
+    if (AYARLAR.proxy && AYARLAR.proxy !== "") {
+      botSecenekleri.agent = new SocksProxyAgent(AYARLAR.proxy);
+      console.log("-> Bağlantı güvenli ev proxy adresi üzerinden maskeleniyor.");
     }
-  }, 15000);
-});
 
-// === GELISMIS SOHBET VE KOMUT SISTEMI ===
-bot.on('chat', (username, message) => {
-  if (username === bot.username) return;
+    bot = mineflayer.createBot(botSecenekleri);
+    bot.loadPlugin(pathfinder);
 
-  const mesaj = message.trim().toLowerCase();
+    // INSAN TAKLITI VERI PAKETLERI
+    bot.on('login', () => {
+      console.log(`>>> Sızma Başarılı! Sunucuya girildi: ${bot.username}`);
+      // Gerçek insan pingleme takliti (Sunucu botu canlı oyuncu sansın diye)
+      setInterval(() => {
+        if (bot && bot._client) bot._client.write('keep_alive', { id: Math.floor(Math.random() * 1000) });
+      }, 10000);
+    });
 
-  // TPA ISTEKLERINI KONTROL ETME (Sadece klandakileri kabul eder)
-  if (mesaj.includes('tpa') || mesaj.includes('teleport')) {
-    if (klanListesi.has(username)) {
-      bot.chat(`/tpaccept ${username}`);
-      bot.chat(`/tpyes ${username}`);
-      console.log(`> Klandan ${username} kişisinin TPA isteği kabul edildi.`);
-    } else {
-      bot.chat(`/tpdeny ${username}`);
-      console.log(`> Klanda olmayan ${username} kişisinin TPA isteği reddedildi.`);
-    }
-  }
+    bot.on('spawn', () => {
+      console.log(">>> Bot dünyada doğdu. Koruma duvarı aşıldı!");
+      
+      // Gerçekçi ilk doğuş gecikmesi (Girer girmez komut yazmaz, bekler)
+      setTimeout(() => {
+        bot.chat('/register S2kBot123 S2kBot123'); 
+        bot.chat('/login S2kBot123');
+      }, 3000);
+      
+      // ULTRA INSANSI ANTI-AFK DÖNGÜSÜ
+      const afkInterval = setInterval(() => {
+        if (!bot) return clearInterval(afkInterval);
+        const eylem = Math.random();
 
-  // Sadece sahiplerinin (umut veya umutedfg2) kullanabileceği komutlar
-  if (klanListesi.has(username)) {
-    
-    // Takip Etme Sistemi
-    if (mesaj === 'takip et') {
-      const target = bot.players[username]?.entity;
-      if (!target) {
-        bot.chat('Seni goremiyorum, yaklasman lazim.');
-        return;
+        if (eylem < 0.2) {
+          // Rastgele kafayı oynatma (Z ekseni ve Y ekseni bakışı)
+          const yaw = (Math.random() * 360 - 180) * (Math.PI / 180);
+          const pitch = (Math.random() * 60 - 30) * (Math.PI / 180);
+          bot.look(yaw, pitch);
+        } else if (eylem < 0.4) {
+          // Ufak bir adım atıp durma
+          bot.setControlState('forward', true);
+          setTimeout(() => bot.setControlState('forward', false), 400);
+        } else if (eylem < 0.6) {
+          bot.setControlState('jump', true);
+          setTimeout(() => bot.setControlState('jump', false), 300);
+        } else if (eylem < 0.8) {
+          // Elindeki eşyayı slottan silme/değiştirme takliti
+          const slot = Math.floor(Math.random() * 9);
+          bot.setQuickBarSlot(slot);
+        } else {
+          bot.swingArm('right');
+        }
+      }, 12000); // 12 saniyede bir insansı hareketler yapar
+    });
+
+    // GELISMIS SOHBET VE ESKI KOMUTLARIN TAMAMI
+    bot.on('chat', (username, message) => {
+      if (username === bot.username) return;
+      const mesaj = message.trim().toLowerCase();
+
+      // TPA Filtresi (Eski Özellik)
+      if (mesaj.includes('tpa') || mesaj.includes('teleport')) {
+        if (klanListesi.has(username)) {
+          bot.chat(`/tpaccept ${username}`);
+          bot.chat(`/tpyes ${username}`);
+          console.log(`> Klandan ${username} TPA isteği kabul edildi.`);
+        } else {
+          bot.chat(`/tpdeny ${username}`);
+          console.log(`> Yabancı ${username} TPA isteği reddedildi.`);
+        }
       }
-      takipEdilenOyuncu = username;
-      bot.chat('Seni takip etmeye basliyorum.');
-      baslaTakip(target);
-    }
 
-    // Takibi Bırakma
-    if (mesaj === 'dur') {
-      takipEdilenOyuncu = null;
-      bot.pathfinder.setGoal(null);
-      bot.chat('Takip durduruldu.');
-    }
+      // Yetkili Kontrolleri (umut ve umutedfg2)
+      if (klanListesi.has(username)) {
+        // Takip Et Komutu
+        if (mesaj === 'takip et') {
+          const target = bot.players[username]?.entity;
+          if (!target) {
+            bot.chat('Seni goremiyorum, yaklasman lazim.');
+            return;
+          }
+          takipEdilenOyuncu = username;
+          bot.chat('Seni takip etmeye basliyorum.');
+          const defaultMovements = new Movements(bot);
+          bot.pathfinder.setMovements(defaultMovements);
+          bot.pathfinder.setGoal(new GoalFollow(target, 2), true);
+        }
 
-    // Klana/İzinli Listesine Oyuncu Ekleme
-    if (mesaj.startsWith('klan ekle ')) {
-      const eklenecek = message.split(' ')[2];
-      if (eklenecek) {
-        klanListesi.add(eklenecek);
-        bot.chat(`${eklenecek} klana ve izin verilenler listesine eklendi.`);
+        // Dur Komutu
+        if (mesaj === 'dur') {
+          takipEdilenOyuncu = null;
+          bot.pathfinder.setGoal(null);
+          bot.chat('Takip durduruldu.');
+        }
+
+        // Klan Ekleme Komutu
+        if (mesaj.startsWith('klan ekle ')) {
+          const eklenecek = message.split(' ')[2];
+          if (eklenecek) {
+            klanListesi.add(eklenecek);
+            bot.chat(`${eklenecek} listeye eklendi.`);
+          }
+        }
+
+        // Klan Silme Komutu
+        if (mesaj.startsWith('klan sil ')) {
+          const silinecek = message.split(' ')[2];
+          if (silinecek && silinecek !== 'umut' && silinecek !== 'umutedfg2') {
+            klanListesi.delete(silinecek);
+            bot.chat(`${silinecek} klandan cikarildi.`);
+          }
+        }
+
+        // TPA Atma Komutu
+        if (mesaj.startsWith('tpa at ')) {
+          const hedef = message.split(' ')[2];
+          if (hedef) bot.chat(`/tpa ${hedef}`);
+        }
       }
-    }
+    });
 
-    // Klandan Oyuncu Silme
-    if (mesaj.startsWith('klan sil ')) {
-      const silinecek = message.split(' ')[2];
-      // Ana sahiplerin silinmesini engellemek için kontrol
-      if (silinecek && silinecek !== 'umut' && silinecek !== 'umutedfg2') {
-        klanListesi.delete(silinecek);
-        bot.chat(`${silinecek} klandan cikarildi.`);
+    bot.on('entityMoved', (entity) => {
+      if (takipEdilenOyuncu && entity.username === takipEdilenOyuncu) {
+        bot.pathfinder.setGoal(new GoalFollow(entity, 2), true);
       }
-    }
+    });
 
-    // Herkese TPA Atma Komutu
-    if (mesaj.startsWith('tpa at ')) {
-      const hedef = message.split(' ')[2];
-      if (hedef) {
-        bot.chat(`/tpa ${hedef}`);
-      }
-    }
-  }
-});
+    bot.on('kicked', (reason) => {
+      console.log(`!!! Sunucudan atılma gerçekleşti. Sebep: ${reason}`);
+      yenidenBaglan();
+    });
 
-// Takip Fonksiyonu
-function baslaTakip(target) {
-  const defaultMovements = new Movements(bot);
-  bot.pathfinder.setMovements(defaultMovements);
-  bot.pathfinder.setGoal(new GoalFollow(target, 2), true);
+    bot.on('error', (err) => {
+      console.log(`!!! Bağlantı hatası: ${err.message}`);
+      yenidenBaglan();
+    });
+
+  }, rastgeleGecikme);
 }
 
-// Oyuncu uzaklaşıp tekrar görünürse takibe devam etmesi için
-bot.on('entityMoved', (entity) => {
-  if (takipEdilenOyuncu && entity.username === takipEdilenOyuncu) {
-    bot.pathfinder.setGoal(new GoalFollow(entity, 2), true);
-  }
-});
+function yenidenBaglan() {
+  const sonrakiDene = Math.floor(Math.random() * 10000) + 10000; // 10-20 saniye arası rastgele bekle (Sunucu bot döngüsünü anlamasın diye)
+  console.log(`>>> Sabırlı Mod: ${sonrakiDene / 1000} saniye sonra tamamen yeni bir kimlikle sızma denenecek...`);
+  setTimeout(() => { botuBaslat(); }, sonrakiDene);
+}
 
-// Hataları ve Atılmaları Loglama
-bot.on('kicked', (reason) => {
-  console.log("!!! Bot sunucudan atildi: " + reason);
-});
-
-bot.on('error', (err) => {
-  console.log("!!! Bir hata olustu: ", err);
-});
+botuBaslat();
