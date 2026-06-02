@@ -1,13 +1,14 @@
 {
   "name": "s2k-anarsi-bot",
   "version": "1.0.0",
-  "description": "Gelismis Anarsi Botu",
+  "description": "Ultra Gizli Anarsi Botu",
   "main": "s2k_anarsi.js",
   "scripts": {
     "start": "node s2k_anarsi.js"
   },
   "dependencies": {
     "mineflayer": "^4.20.0",
-    "mineflayer-pathfinder": "^2.4.0"
+    "mineflayer-pathfinder": "^2.4.0",
+    "socks-proxy-agent": "^8.0.2"
   }
 }
