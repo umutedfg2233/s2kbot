@@ -4,16 +4,17 @@ const GoalFollow = goals.GoalFollow;
 const http = require('http');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
-console.log("=== S2K_BOT: BUNGEECORD/VELOCITY GECIS MODU BASLATILIYOR ===");
+console.log("=== S2K_BOT: 1.21.1 GELISTIRILMIS UZMAN MOD AKTIF ===");
 
-// Global Hata Yakalayıcı: Geçiş sırasındaki ani kopmalarda Railway'in çökmesini önler
+// Global Hata Yakalayıcı: Geçiş ekranındaki anlık paket düşmelerinde Railway'in çökmesini önler
 process.on('uncaughtException', (err) => {
-  console.log(`[Sunucu Geçiş Hatası Engellendi] ${err.message}`);
+  console.log(`[Protokol Güvenliği] Hafif ağ dalgalanması yakalandı: ${err.message}`);
 });
 
+// Railway Canlı Tutma Web Servisi
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('s2k_bot Sorunsuz Aktif!\n');
+  res.end('s2k_bot Sorunsuz Calisiyor!\n');
 });
 server.listen(process.env.PORT || 3000);
 
@@ -37,7 +38,7 @@ let ayniIpDenemeSayisi = 0;
 const klanListesi = new Set(['umut', 'umutedfg2']); 
 let bot = null;
 let takipEdilenOyuncu = null;
-let lobiGirisYapildi = false;
+let lobiGirisDurumu = false;
 
 function botuBaslat() {
   if (bot) {
@@ -45,56 +46,63 @@ function botuBaslat() {
     bot = null;
   }
   
-  lobiGirisYapildi = false; // Her yeni bağlantıda sıfırla
+  lobiGirisDurumu = false; 
   const gecerliProxy = PROXY_LISTESI[aktifProxyIndex];
-  console.log(`>>> [Bağlantı] ${AYARLAR.username} -> Proxy: ${aktifProxyIndex + 1}/${PROXY_LISTESI.length}`);
+  console.log(`>>> [Hatta Giriş] ${AYARLAR.username} | Proxy: ${aktifProxyIndex + 1}/${PROXY_LISTESI.length}`);
 
   bot = mineflayer.createBot({
     host: AYARLAR.host,
     username: AYARLAR.username,
     version: AYARLAR.version,
-    checkTimeoutInterval: 240000, // Sunucu geçişindeki (Configuration) donmaları önlemek için süre 4 dakikaya çıkarıldı
+    checkTimeoutInterval: 60000, // Railway ve Mineflayer arasındaki en dengeli süre (60 Saniye)
     physicsEnabled: true,
     agent: new SocksProxyAgent(gecerliProxy)
   });
 
   bot.loadPlugin(pathfinder);
 
+  // Sunucu değiştirirken (Lobi -> Anarşi) tetiklenen 1.21.1 durum takipçisi
+  bot.on('stateChanged', (state) => {
+    console.log(`>>> [Ağ Katmanı] Bot şu an kararlı duruma geçti: ${state}`);
+    if (state === 'configuration') {
+      console.log(">>> [Configuration] Sunucular arası köprü kuruluyor, veri paketleri senkronize ediliyor.");
+    }
+  });
+
   bot.on('login', () => {
-    console.log(`>>> LOBİ BAĞLANTISI: Bot giriş kapısına ulaştı.`);
+    console.log(`>>> BAĞLANTI BAŞARILI: Bot 1.21.1 kapısından giriş yaptı.`);
     ayniIpDenemeSayisi = 0; 
   });
 
-  // Bot lobide ilk doğduğunda tetiklenir
   bot.on('spawn', () => {
-    // Eğer zaten şifre yazdıysak ve sunucu bizi aktarıyorsa, tekrar şifre yazıp paketi bozma!
-    if (lobiGirisYapildi) {
-      console.log(">>> [Aktarım/Configuration] Bot şu an anarşi dünyasına taşınıyor, komut engellendi.");
+    // Aktarım ekranındayken komut göndermeyi engeller, paketi korur
+    if (lobiGirisDurumu) {
+      console.log(">>> [Dünya Değişimi] Bot şu an ana dünyaya aktarılıyor. Komut askıya alındı.");
       return;
     }
 
-    console.log(`>>> Lobi dünyası yüklendi. Güvenli geçiş için 3 saniye sonra TEK SEFERLİK şifre giriliyor...`);
+    console.log(`>>> Giriş lobisi algılandı. Doğrulama şifresi iletiliyor...`);
     
     setTimeout(() => {
-      if (bot && bot._client && bot._client.state === 'play' && !lobiGirisYapildi) {
-        lobiGirisYapildi = true; // Şifrenin sadece 1 kere gitmesini garantiye alıyoruz
-        console.log("-> Lobi doğrulama şifresi sunucuya gönderildi. Aktarım bekleniyor...");
+      if (bot && bot._client && bot._client.state === 'play' && !lobiGirisDurumu) {
+        lobiGirisDurumu = true; // Şifrenin sadece tek sefer gitmesini garanti eder
+        console.log("-> Giriş paketi başarıyla gönderildi. Aktarım aşaması bekleniyor...");
         bot.chat('/register s2k_bot123 s2k_bot123'); 
         bot.chat('/login s2k_bot123');
       }
-    }, 3000);
+    }, 3000); 
   });
 
-  // Bot Lobi'den başarıyla sıyrılıp ana Anarşi dünyasına ayak bastığında bu event tetiklenir
+  // Bot lobi aktarımını (Configuration) başarıyla tamamlayıp ana dünyaya indiğinde tetiklenir
   bot.on('game', () => {
-    if (lobiGirisYapildi) {
+    if (lobiGirisDurumu) {
       console.log("=================================================");
-      console.log(">>> BAŞARI: ANA ANARŞİ DÜNYASINA SIZMA SAĞLANDI! <<<");
+      console.log(">>> BAŞARI: S2K_BOT ANA ANARŞİ DÜNYASINDA AKTİF! <<<");
       console.log("=================================================");
     }
   });
 
-  // KOMUTLAR (Klan, TPA, Takip)
+  // OYUN İÇİ KOMUTLAR (Klan, Takip, TPA mekanizmaları eksiksiz korunmuştur)
   bot.on('chat', (username, message) => {
     if (!bot || username === bot.username) return;
     const mesaj = message.trim().toLowerCase();
@@ -110,6 +118,7 @@ function botuBaslat() {
         if (target) {
           takipEdilenOyuncu = username;
           bot.chat('Takip basladi.');
+          bot.pathfinder.setMovements(new Movements(bot));
           bot.pathfinder.setGoal(new GoalFollow(target, 2), true);
         }
       }
@@ -138,12 +147,12 @@ function botuBaslat() {
     if (typeof reason === 'object') {
       try { temizSebep = JSON.stringify(reason); } catch (e) {}
     }
-    console.log(`!!! Bağlantı Kesildi. Sunucu Yanıtı: ${temizSebep}`);
+    console.log(`!!! Sunucu bağlantıyı kesti. Detay: ${temizSebep}`);
     yenidenBaglanYonetimi();
   });
 
   bot.on('error', (err) => {
-    console.log(`!!! Ağ Hatası: ${err.message}`);
+    console.log(`!!! Protokol / Ağ hatası: ${err.message}`);
     yenidenBaglanYonetimi();
   });
 }
@@ -154,10 +163,10 @@ function yenidenBaglanYonetimi() {
   if (ayniIpDenemeSayisi >= 2) {
     ayniIpDenemeSayisi = 0;
     aktifProxyIndex = (aktifProxyIndex + 1) % PROXY_LISTESI.length;
-    console.log(`>>> Hat temizleniyor, sonraki Ev IP'sine geçiliyor...`);
+    console.log(`>>> Tünel değiştiriliyor, sonraki temiz Ev IP'sine geçildi.`);
   }
 
-  console.log(">>> Sunucu kapılarının temizlenmesi için 25 saniye bekleniyor...");
+  console.log(">>> Sunucu güvenliği için 25 saniye bekleniyor...");
   setTimeout(() => { botuBaslat(); }, 25000);
 }
 
