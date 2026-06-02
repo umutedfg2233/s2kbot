@@ -70,3 +70,14 @@ http.createServer((req, res) => {
   res.writeHead(200);
   res.end('Bot aktif!');
 }).listen(process.env.PORT || 10000);
+bot.on('login', () => {
+  console.log("Bot sunucuya giriş yaptı!");
+});
+
+bot.on('spawn', () => {
+  console.log("Bot oyunda doğdu (spawn oldu)!");
+});
+
+bot.on('kicked', (reason) => {
+  console.log("Bot sunucudan atıldı: " + reason);
+});
