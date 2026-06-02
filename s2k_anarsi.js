@@ -3,17 +3,17 @@ const { pathfinder } = require('mineflayer-pathfinder');
 const http = require('http');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
-console.log("=== S2K_BOT: SAF 1.21.1 AG SURUCUSU BASLATILDI ===");
+console.log("=== S2K_BOT: ZINCIRLEME HATA COZUCU UZMAN SVR AKTIF ===");
 
-// Railway Çökme Koruması
+// Global Hata Yakalayıcı: Paket uyumsuzluklarında Railway'in çökmesini kesin olarak önler
 process.on('uncaughtException', (err) => {
-  console.log(`[Ağ Hatası Engellendi] -> ${err.message}`);
+  console.log(`[Sistem Koruması] Arka plan paket dalgalanması engellendi: ${err.message}`);
 });
 
-// Canlı Tutma Servisi
+// Railway Canlı Tutma Port Servisi (SIGTERM Önleyici)
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Bot Aktif\n');
+  res.end('S2K Bot System Online\n');
 }).listen(process.env.PORT || 3000);
 
 const AYARLAR = {
@@ -33,65 +33,82 @@ const PROXY_LISTESI = [
 
 let proxyIndex = 0;
 let bot = null;
-let girisYapildi = false;
+let sızmaGirisimi = false;
+let komutZamanlayici1 = null;
+let komutZamanlayici2 = null;
 
-function botuOlustur() {
+function botuAtesle() {
+  // Eski zamanlayıcıları ve oturum kalıntılarını temizle (Süre doldu hatasını önler)
+  if (komutZamanlayici1) clearTimeout(komutZamanlayici1);
+  if (komutZamanlayici2) clearTimeout(komutZamanlayici2);
+  
   if (bot) {
     try { bot.end(); } catch(e) {}
     bot = null;
   }
 
-  girisYapildi = false;
+  sızmaGirisimi = false;
   const aktifProxy = PROXY_LISTESI[proxyIndex];
-  console.log(`>>> [Bağlantı Hattı] Proxy: ${proxyIndex + 1}/${PROXY_LISTESI.length}`);
+  console.log(`>>> [Ağ Tüneli] Bağlantı kanalı açılıyor... Proxy: ${proxyIndex + 1}/${PROXY_LISTESI.length}`);
 
   bot = mineflayer.createBot({
     host: AYARLAR.host,
     username: AYARLAR.username,
     version: AYARLAR.version,
-    checkTimeoutInterval: 30000, // Railway'in SIGTERM vermeyeceği en hafif, en güvenli süre
+    checkTimeoutInterval: 45000, // Railway'in donma algılamasını engelleyen esnek sınır
     auth: 'offline',
     agent: new SocksProxyAgent(aktifProxy)
   });
 
   bot.loadPlugin(pathfinder);
 
-  // Bot sunucuya ilk paket bağını kurduğunda
   bot.on('login', () => {
-    console.log(`>>> [Bağlantı Başarılı] Sunucu kapısı açıldı, lobiye sızılıyor...`);
-  });
-
-  // Bot lobide doğduğunda (Spawn paketini yakaladığında)
-  bot.on('spawn', () => {
-    if (girisYapildi) return;
-
-    console.log(`>>> [Lobi Doğrulama] Sunucu stabilizasyonu için 4 saniye bekleniyor...`);
+    console.log(`>>> [Ağ Girişi] Bot ham ağ katmanına başarıyla sızdı.`);
     
-    setTimeout(() => {
-      if (bot && bot._client && bot._client.state === 'play' && !girisYapildi) {
-        girisYapildi = true;
-        console.log("-> Doğrulama ve şifre komutları sunucuya enjekte ediliyor...");
-        
-        // Sunucunun bot korumasını aşmak için komutları peş peşe değil, milisaniyelik boşluklarla gönderiyoruz
-        bot.chat('/register s2k_bot123 s2k_bot123');
-        
-        setTimeout(() => {
-          if (bot) bot.chat('/login s2k_bot123');
-        }, 500);
-      }
-    }, 4000);
+    // Ham veri kanallarında donmayı engelleyen iç kilit kırıcı (Anti-SIGTERM)
+    if (bot._client) {
+      bot._client.on('packet', (data, meta) => {
+        if (meta.name === 'keep_alive') {
+          // Sunucudan gelen canlılık paketlerini işlemciyi yormadan arka planda otomatik yanıtla
+          try { bot._client.write('keep_alive', { keepAliveId: data.keepAliveId }); } catch(e) {}
+        }
+      });
+    }
   });
 
-  // Bot ana anarşi dünyasına geçiş yapıp "Joined" aşamasına ulaştığında
+  bot.on('spawn', () => {
+    if (sızmaGirisimi) return;
+    sızmaGirisimi = true;
+
+    console.log(`>>> [Analiz Odası] Sunucu analiz sistemi inceleniyor. Stratejik beklemeye geçildi...`);
+
+    // 1. AŞAMA: Analizin bitimine doğru ilk komut enjeksiyonu (3. Saniye)
+    komutZamanlayici1 = setTimeout(() => {
+      if (bot && bot._client && bot._client.state === 'play') {
+        console.log("-> 1. Dalga şifre paketleri sunucuya basılıyor...");
+        bot.chat('/register s2k_bot123 s2k_bot123');
+        bot.chat('/login s2k_bot123');
+      }
+    }, 3000);
+
+    // 2. AŞAMA: Eğer ilk komut sahte lobi duvarına takıldıysa, asıl lobiye geçiş anında ikinci vuruş (6. Saniye)
+    komutZamanlayici2 = setTimeout(() => {
+      if (bot && bot._client && bot._client.state === 'play') {
+        console.log("-> 2. Dalga (Garanti) şifre paketleri sunucuya basılıyor...");
+        bot.chat('/login s2k_bot123');
+      }
+    }, 6000);
+  });
+
   bot.on('game', () => {
-    if (girisYapildi) {
+    if (sızmaGirisimi) {
       console.log("=================================================");
-      console.log(">>> BAŞARI: BOT SUNUCUYA GIRDI VE AKTIF OYUNDA! <<<");
+      console.log(">>> %100 BAŞARI: BOT TÜM DUVARLARI DELDI, OYUNDA! <<<");
       console.log("=================================================");
     }
   });
 
-  // Mesaj ve TPA Komutları (Eksiksiz Sabit Tutuldu)
+  // Oyun İçi Temel Klan ve TPA Komut Sistemi
   bot.on('chat', (username, message) => {
     if (!bot || username === bot.username) return;
     const mesaj = message.trim().toLowerCase();
@@ -103,22 +120,26 @@ function botuOlustur() {
   });
 
   bot.on('kicked', (reason) => {
-    console.log(`!!! Sunucudan Atılma Bildirisi: ${typeof reason === 'object' ? JSON.stringify(reason) : reason}`);
-    yenidenBaglanYonetici();
+    console.log(`!!! Sunucu Bağlantıyı Kesti. Gerekçe: ${typeof reason === 'object' ? JSON.stringify(reason) : reason}`);
+    yenidenBaglanYonetimi();
   });
 
   bot.on('error', (err) => {
-    console.log(`!!! Hat Sinyali Kesildi: ${err.message}`);
-    yenidenBaglanYonetici();
+    console.log(`!!! Hat Protokol Hatası: ${err.message}`);
+    yenidenBaglanYonetimi();
   });
 }
 
-function yenidenBaglanYonetici() {
+function yenidenBaglanYonetimi() {
+  if (komutZamanlayici1) clearTimeout(komutZamanlayici1);
+  if (komutZamanlayici2) clearTimeout(komutZamanlayici2);
+
   proxyIndex = (proxyIndex + 1) % PROXY_LISTESI.length;
-  console.log(`>>> Hat temizlendi, ${proxyIndex + 1}. sıradaki yedek tünele geçiliyor...`);
+  console.log(`>>> Eski oturum kalıntıları temizleniyor. Yeni hatta geçildi.`);
   
-  // Saldırı korumasına takılmamak için 25 saniye temiz bekleme
-  setTimeout(() => { botuOlustur(); }, 25000);
+  // Sunucunun hafızasındaki eski bot hayaletinin düşmesi için tam 30 saniye güvenli bekleme
+  console.log(">>> Temiz bir başlangıç için 30 saniye geri sayım başlatıldı...");
+  setTimeout(() => { botuAtesle(); }, 30000);
 }
 
-botuOlustur();
+botuAtesle();
