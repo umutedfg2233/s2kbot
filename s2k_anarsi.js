@@ -1,49 +1,63 @@
 const mineflayer = require('mineflayer');
+const http = require('http');
+
+// Render portunu canlı tutmak için
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot aktif!');
+}).listen(process.env.PORT || 10000);
+
+// Rastgele isim oluşturucu (Anti-Bot'u şaşırtmak için)
+const randomName = 'S2k_' + Math.floor(Math.random() * 9000 + 1000);
 
 const bot = mineflayer.createBot({
   host: 'mc.quiltanarchy.xyz',
-  username: 'S2k_Bot',
-  version: '1.21.1' 
+  username: randomName,
+  version: '1.21.1',
+  checkTimeoutInterval: 60000 // Bağlantı zaman aşımını uzatıyoruz
 });
 
-let clanMembers = []; // Clan listesi
-let following = null; // Takip edilecek oyuncu
+let clanMembers = [];
+let following = null;
 
-// Anti-AFK (Arada zıpla veya dön)
+// Anti-AFK (Daha doğal olması için zamanlamayı değiştirdik)
 setInterval(() => {
   bot.setControlState('jump', true);
-  setTimeout(() => bot.setControlState('jump', false), 500);
-}, 60000);
+  setTimeout(() => bot.setControlState('jump', false), 400);
+}, 45000);
+
+bot.on('login', () => {
+  console.log(`Giriş yapıldı: ${randomName}`);
+});
 
 bot.on('spawn', () => {
-  console.log("Bot QuiltAnarchy sunucusuna giriş yaptı!");
+  console.log("Bot oyunda doğdu!");
+  bot.chat("Selam, S2k_Bot aktif!");
 });
 
 bot.on('chat', (username, message) => {
   if (username === bot.username) return;
 
-  // #clan add [isim]
   if (message.startsWith('#clan add ')) {
     const target = message.split(' ')[2];
-    clanMembers.push(target);
-    bot.chat(`${target} clan listesine eklendi.`);
+    if (!clanMembers.includes(target)) {
+      clanMembers.push(target);
+      bot.chat(`${target} clan listesine eklendi.`);
+    }
   }
 
-  // #tpa [isim] (Sadece clan üyeleri kullanabilir)
   if (message.startsWith('#tpa ')) {
     if (clanMembers.includes(username)) {
       const target = message.split(' ')[1];
       bot.chat(`/tpa ${target}`);
-      bot.chat(`${target} kişisine TPA isteği gönderildi.`);
     } else {
       bot.chat("Bu komutu kullanmak için clan üyesi olmalısın.");
     }
   }
 
-  // #takip [isim]
   if (message.startsWith('#takip ')) {
     following = message.split(' ')[1];
-    bot.chat(`${following} kişisi takip ediliyor.`);
+    bot.chat(`${following} takip ediliyor.`);
   }
 
   if (message === '#dur') {
@@ -52,32 +66,16 @@ bot.on('chat', (username, message) => {
   }
 });
 
-// Takip etme mantığı
 bot.on('physicsTick', () => {
-  if (following) {
-    const player = bot.players[following];
-    if (player && player.entity) {
-      bot.lookAt(player.entity.position.offset(0, player.entity.height, 0));
-    }
+  if (following && bot.players[following] && bot.players[following].entity) {
+    bot.lookAt(bot.players[following].entity.position.offset(0, 1.6, 0));
   }
 });
 
-bot.on('error', (err) => console.log('Hata: ', err));
-
-console.log("Bot başlatıldı ve özellikler yüklendi!");
-const http = require('http');
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('Bot aktif!');
-}).listen(process.env.PORT || 10000);
-bot.on('login', () => {
-  console.log("Bot sunucuya giriş yaptı!");
-});
-
-bot.on('spawn', () => {
-  console.log("Bot oyunda doğdu (spawn oldu)!");
-});
-
 bot.on('kicked', (reason) => {
-  console.log("Bot sunucudan atıldı: " + reason);
+  console.log("Sunucudan atıldı: " + reason);
+});
+
+bot.on('error', (err) => {
+  console.log('Hata: ', err);
 });
