@@ -1,22 +1,67 @@
 const mineflayer = require('mineflayer');
 
 const bot = mineflayer.createBot({
-  host: '6b6t.org', // Sunucu IP adresini buraya yaz
-  username: 'SeninBotIsmin', // Botun ismi
-  version: '1.20.1' // Sunucu sürümü
+  host: 'mc.quiltanarchy.xyz',
+  username: 'S2k_Bot',
+  version: '1.21.1' 
 });
 
+let clanMembers = []; // Clan listesi
+let following = null; // Takip edilecek oyuncu
+
+// Anti-AFK (Arada zıpla veya dön)
+setInterval(() => {
+  bot.setControlState('jump', true);
+  setTimeout(() => bot.setControlState('jump', false), 500);
+}, 60000);
+
 bot.on('spawn', () => {
-  console.log("Bot oyuna girdi!");
+  console.log("Bot QuiltAnarchy sunucusuna giriş yaptı!");
 });
 
 bot.on('chat', (username, message) => {
-  if (message === '#konum') {
-    bot.chat(`Konumum: ${bot.entity.position}`);
+  if (username === bot.username) return;
+
+  // #clan add [isim]
+  if (message.startsWith('#clan add ')) {
+    const target = message.split(' ')[2];
+    clanMembers.push(target);
+    bot.chat(`${target} clan listesine eklendi.`);
+  }
+
+  // #tpa [isim] (Sadece clan üyeleri kullanabilir)
+  if (message.startsWith('#tpa ')) {
+    if (clanMembers.includes(username)) {
+      const target = message.split(' ')[1];
+      bot.chat(`/tpa ${target}`);
+      bot.chat(`${target} kişisine TPA isteği gönderildi.`);
+    } else {
+      bot.chat("Bu komutu kullanmak için clan üyesi olmalısın.");
+    }
+  }
+
+  // #takip [isim]
+  if (message.startsWith('#takip ')) {
+    following = message.split(' ')[1];
+    bot.chat(`${following} kişisi takip ediliyor.`);
+  }
+
+  if (message === '#dur') {
+    following = null;
+    bot.chat("Takip durduruldu.");
   }
 });
 
-bot.on('error', (err) => console.log(err));
+// Takip etme mantığı
+bot.on('physicsTick', () => {
+  if (following) {
+    const player = bot.players[following];
+    if (player && player.entity) {
+      bot.lookAt(player.entity.position.offset(0, player.entity.height, 0));
+    }
+  }
+});
 
-// Botun başarıyla başlatıldığını loglarda görmek için:
-console.log("Bot baslatildi!");
+bot.on('error', (err) => console.log('Hata: ', err));
+
+console.log("Bot başlatıldı ve özellikler yüklendi!");
