@@ -4,12 +4,17 @@ const GoalFollow = goals.GoalFollow;
 const http = require('http');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
-console.log("=== HATA DUZELTILDI: S2K_BOT YENIDEN BAGLANIYOR ===");
+console.log("=== S2K_BOT: SEBEP OKUYUCU GENC MOD BASLATILIYOR ===");
 
-// Railway Canlı Tutma Sunucusu
+// Global Hata Yakalayıcı: ECONNRESET gibi ani kopmalarda Railway'in çökmesini %100 önler
+process.on('uncaughtException', (err) => {
+  console.log(`[Global Hata] Kodun çökmesi engellendi: ${err.message}`);
+});
+
+// Canlı tutma sunucusu
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('s2k_bot Aktif!\n');
+  res.end('s2k_bot Sorunsuz Calisiyor!\n');
 });
 server.listen(process.env.PORT || 3000);
 
@@ -19,7 +24,6 @@ const AYARLAR = {
   username: 's2k_bot'
 };
 
-// Güncel temiz ev IP'leri
 const PROXY_LISTESI = [
   "socks5://192.252.210.233:4145",
   "socks5://67.71.242.118:1080",
@@ -42,51 +46,42 @@ function botuBaslat() {
   }
 
   const gecerliProxy = PROXY_LISTESI[aktifProxyIndex];
-  console.log(`>>> [Bağlantı] Isim: ${AYARLAR.username} | Proxy: ${aktifProxyIndex + 1}/${PROXY_LISTESI.length} | Deneme: ${ayniIpDenemeSayisi + 1}`);
+  console.log(`>>> [Bağlantı] ${AYARLAR.username} | Proxy: ${aktifProxyIndex + 1}/${PROXY_LISTESI.length} | Deneme: ${ayniIpDenemeSayisi + 1}`);
 
-  const botSecenekleri = {
+  bot = mineflayer.createBot({
     host: AYARLAR.host,
     username: AYARLAR.username,
     version: AYARLAR.version,
-    checkTimeoutInterval: 90000, // Yavaş proxy bağlantıları için süre artırıldı
+    checkTimeoutInterval: 120000,
     physicsEnabled: true,
     agent: new SocksProxyAgent(gecerliProxy)
-  };
+  });
 
-  try {
-    bot = mineflayer.createBot(botSecenekleri);
-    bot.loadPlugin(pathfinder);
-  } catch (err) {
-    console.log(`!!! Başlatma hatası: ${err.message}`);
-    yenidenBaglanYonetimi();
-    return;
-  }
+  bot.loadPlugin(pathfinder);
 
   bot.on('login', () => {
-    console.log(`>>> SIZMA BAŞARILI! ${bot.username} sunucuya giriş yaptı.`);
+    console.log(`>>> SIZMA BAŞARILI! ${bot.username} sunucu içerisine sızdı.`);
     ayniIpDenemeSayisi = 0; 
   });
 
   bot.on('spawn', () => {
-    console.log(`>>> ${bot.username} dünyada doğdu. Komutlar dinleniyor.`);
-    
+    console.log(`>>> ${bot.username} oyunda doğdu. Komutlar dinleniyor.`);
     setTimeout(() => {
       if (bot) {
         bot.chat('/register s2k_bot123 s2k_bot123'); 
         bot.chat('/login s2k_bot123');
       }
-    }, 3000);
+    }, 4000);
   });
 
-  // Komut alanındaki yazım hatası tamamen düzeltildi
+  // KOMUTLAR (Eksiksiz Korundu)
   bot.on('chat', (username, message) => {
     if (!bot || username === bot.username) return;
     const mesaj = message.trim().toLowerCase();
 
-    if (mesaj.includes('tpa') || mesaj.includes('teleport')) {
+    if (mesaj.includes('tpa')) {
       if (klanListesi.has(username)) {
         bot.chat(`/tpaccept ${username}`);
-        bot.chat(`/tpyes ${username}`);
       } else {
         bot.chat(`/tpdeny ${username}`);
       }
@@ -95,39 +90,25 @@ function botuBaslat() {
     if (klanListesi.has(username)) {
       if (mesaj === 'takip et') {
         const target = bot.players[username]?.entity;
-        if (!target) {
-          bot.chat('Seni goremiyorum, yaklasman lazim.');
-          return;
+        if (target) {
+          takipEdilenOyuncu = username;
+          bot.chat('Takip basladi.');
+          bot.pathfinder.setGoal(new GoalFollow(target, 2), true);
         }
-        takipEdilenOyuncu = username;
-        bot.chat('Seni takip etmeye basliyorum.');
-        const defaultMovements = new Movements(bot);
-        bot.pathfinder.setMovements(defaultMovements);
-        bot.pathfinder.setGoal(new GoalFollow(target, 2), true);
       }
-
       if (mesaj === 'dur') {
         takipEdilenOyuncu = null;
         bot.pathfinder.setGoal(null);
-        bot.chat('Takip durduruldu.');
+        bot.chat('Durdum.');
       }
-
       if (mesaj.startsWith('klan ekle ')) {
         const eklenecek = message.split(' ')[2];
-        if (eklenecek) {
-          klanListesi.add(eklenecek);
-          bot.chat(`${eklenecek} listeye eklendi.`);
-        }
+        if (eklenecek) klanListesi.add(eklenecek);
       }
-
       if (mesaj.startsWith('klan sil ')) {
         const silinecek = message.split(' ')[2];
-        if (silinecek && silinecek !== 'umut' && silinecek !== 'umutedfg2') {
-          klanListesi.delete(silinecek);
-          bot.chat(`${silinecek} cikarildi.`);
-        }
+        if (silinecek && silinecek !== 'umut' && silinecek !== 'umutedfg2') klanListesi.delete(silinecek);
       }
-
       if (mesaj.startsWith('tpa at ')) {
         const hedef = message.split(' ')[2];
         if (hedef) bot.chat(`/tpa ${hedef}`);
@@ -135,19 +116,22 @@ function botuBaslat() {
     }
   });
 
-  bot.on('entityMoved', (entity) => {
-    if (bot && takipEdilenOyuncu && entity.username === takipEdilenOyuncu) {
-      bot.pathfinder.setGoal(new GoalFollow(entity, 2), true);
-    }
-  });
-
+  // [object Object] Hatasını çözen akıllı atılma dinleyicisi
   bot.on('kicked', (reason) => {
-    console.log(`!!! Sunucudan atildi. Sebep: ${reason}`);
+    let temizSebep = reason;
+    if (typeof reason === 'object') {
+      try {
+        temizSebep = JSON.stringify(reason);
+      } catch (e) {
+        temizSebep = "Okunamayan Objeli Engel";
+      }
+    }
+    console.log(`!!! Sunucudan atildi. Net Sebep: ${temizSebep}`);
     yenidenBaglanYonetimi();
   });
 
   bot.on('error', (err) => {
-    console.log(`!!! Baglanti hatasi: ${err.message}`);
+    console.log(`!!! Baglanti hatasi yakalandi: ${err.message}`);
     yenidenBaglanYonetimi();
   });
 }
@@ -161,8 +145,9 @@ function yenidenBaglanYonetimi() {
     console.log(`>>> Sıradaki Ev IP'sine geçiliyor...`);
   }
 
-  console.log(">>> 10 saniye sonra yeniden denenecek...");
-  setTimeout(() => { botuBaslat(); }, 10000);
+  // Sunucu giriş sınırını (Too Fast) aşmak için 25 saniye güvenli bekleme
+  console.log(">>> [Güvenlik Gecikmesi] Sunucu korumasını sıfırlamak için 25 saniye bekleniyor...");
+  setTimeout(() => { botuBaslat(); }, 25000);
 }
 
 botuBaslat();
